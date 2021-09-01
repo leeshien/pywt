@@ -18,7 +18,7 @@ from ._extensions._dwt import dwt_axis, idwt_axis
 from ._utils import _wavelets_per_axis, _modes_per_axis
 
 
-__all__ = ['dwt2', 'idwt2', 'dwtn', 'idwtn']
+__all__ = ['dwt2', 'dwt2_by_batch', 'idwt2', 'dwtn', 'idwtn']
 
 
 def dwt2(data, wavelet, mode='symmetric', axes=(-2, -1)):
@@ -73,6 +73,64 @@ def dwt2(data, wavelet, mode='symmetric', axes=(-2, -1)):
     coefs = dwtn(data, wavelet, mode, axes)
     return coefs['aa'], (coefs['da'], coefs['ad'], coefs['dd'])
 
+def dwt2_by_batch(batch_data, wavelet, mode='symmetric', axes=(-2, -1)):
+    """
+    2D Discrete Wavelet Transform.
+
+    Parameters
+    ----------
+    data : array_like
+        2D array with input data
+    wavelet : Wavelet object or name string, or 2-tuple of wavelets
+        Wavelet to use.  This can also be a tuple containing a wavelet to
+        apply along each axis in ``axes``.
+    mode : str or 2-tuple of strings, optional
+        Signal extension mode, see :ref:`Modes <ref-modes>`. This can
+        also be a tuple of modes specifying the mode to use on each axis in
+        ``axes``.
+    axes : 2-tuple of ints, optional
+        Axes over which to compute the DWT. Repeated elements mean the DWT will
+        be performed multiple times along these axes.
+
+    Returns
+    -------
+    (cA, (cH, cV, cD)) : tuple
+        Approximation, horizontal detail, vertical detail and diagonal
+        detail coefficients respectively.  Horizontal refers to array axis 0
+        (or ``axes[0]`` for user-specified ``axes``).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import pywt
+    >>> data = np.ones((4,4), dtype=np.float64)
+    >>> coeffs = pywt.dwt2(data, 'haar')
+    >>> cA, (cH, cV, cD) = coeffs
+    >>> cA
+    array([[ 2.,  2.],
+           [ 2.,  2.]])
+    >>> cV
+    array([[ 0.,  0.],
+           [ 0.,  0.]])
+
+    """
+    axes = tuple(axes)
+    batch_data = np.asarray(batch_data)
+    if len(axes) != 2:
+        raise ValueError("Expected 2 axes")
+    if batch_data.ndim-1 < len(np.unique(axes)):
+        raise ValueError("Input array has fewer dimensions than the specified "
+                         "axes")
+
+    coefs_LL, coefs_LH, coefs_HL, coefs_HH = [],[],[],[]
+    for data in batch_data:
+        coefs = dwtn(data, wavelet, mode, axes)
+        coefs_LL.append(coefs['aa'])
+        coefs_LH.append(coefs['da'])
+        coefs_HL.append(coefs['ad'])
+        coefs_HH.append(coefs['dd'])
+
+    return coefs_LL, (coefs_LH, coefs_HL, coefs_HH)
 
 def idwt2(coeffs, wavelet, mode='symmetric', axes=(-2, -1)):
     """
